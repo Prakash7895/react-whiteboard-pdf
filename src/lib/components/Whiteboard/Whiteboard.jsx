@@ -33,6 +33,7 @@ import ZoomOutIcon from './../images/zoom-out.svg';
 import DownloadIcon from './../images/download.svg';
 import UploadIcon from './../images/add-photo.svg';
 import FillIcon from './../images/color-fill.svg';
+import UndoIcon from './../images/undo.svg';
 
 const initFileInfo = {
   file: { name: 'whiteboard' },
@@ -87,6 +88,8 @@ const Whiteboard = ({
   const canvasRef = useRef(null);
   const whiteboardRef = useRef(null);
   const uploadPdfRef = useRef(null);
+  const [undoData, setUndoData] = useState([]);
+  const [undoStateChanged, setUndoStateChanged] = useState(false);
 
   const enabledControls = useMemo(
     function () {
@@ -108,6 +111,8 @@ const Whiteboard = ({
         SAVE_AS_IMAGE: true,
         GO_TO_START: true,
         ZOOM: true,
+        UNDO: true,
+        REDO: true,
 
         ...controls,
       };
@@ -205,11 +210,23 @@ const Whiteboard = ({
     canvas.on('object:added', (event) => {
       onObjectAdded(event.target.toJSON(), event, canvas);
       onCanvasChange(event.target.toJSON(), event, canvas);
+      setUndoStateChanged((prev) => {
+        if (!prev) {
+          setUndoData([]);
+        }
+        return false;
+      });
     });
 
     canvas.on('object:removed', (event) => {
       onObjectRemoved(event.target.toJSON(), event, canvas);
       onCanvasChange(event.target.toJSON(), event, canvas);
+      setUndoStateChanged((prev) => {
+        if (!prev) {
+          setUndoData([]);
+        }
+        return false;
+      });
     });
 
     canvas.on('object:modified', (event) => {
@@ -278,8 +295,8 @@ const Whiteboard = ({
     });
   }
 
-  function bringControlTOStartPosition(){
-    board.canvas.viewportTransform=[1, 0, 0, 1, 0, 0];
+  function bringControlTOStartPosition() {
+    board.canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
     board.resetZoom(1);
   }
 
@@ -366,6 +383,30 @@ const Whiteboard = ({
     });
   };
 
+  const onUndo = () => {
+    const objArr = board.canvas.getObjects();
+    const lastItem = objArr[objArr.length - 1];
+    setUndoData((prev) => {
+      const updatedState = [...prev];
+      updatedState.push(lastItem);
+      return updatedState;
+    });
+    setUndoStateChanged(true);
+    board.canvas.remove(lastItem);
+  };
+
+  const onRedo = () => {
+    const lastItem = undoData[undoData.length - 1];
+    setUndoData(undoData.slice(0, undoData.length - 1));
+    setUndoStateChanged(true);
+    board.canvas.add(lastItem);
+  };
+
+  const isUndoDisabled = () => {
+    const objArr = board?.canvas?.getObjects();
+    return !objArr?.length;
+  };
+
   return (
     <WhiteBoardS ref={whiteboardRef}>
       <ToolbarHolderS>
@@ -408,6 +449,28 @@ const Whiteboard = ({
         <ToolbarS>
           {getControls()}
 
+          {!!enabledControls.UNDO && (
+            <ButtonS
+              type="button"
+              title="Undo"
+              disabled={isUndoDisabled()}
+              onClick={() => onUndo()}
+            >
+              <img src={UndoIcon} alt="Undo" />
+            </ButtonS>
+          )}
+
+          {!!enabledControls.REDO && (
+            <ButtonS
+              type="button"
+              title="Redo"
+              disabled={!undoData.length}
+              onClick={() => onRedo()}
+            >
+              <img style={{ transform: 'rotateY(180deg)' }} src={UndoIcon} alt="Undo" />
+            </ButtonS>
+          )}
+
           {!!enabledControls.CLEAR && (
             <ButtonS type="button" onClick={() => board.clearCanvas()}>
               <img src={DeleteIcon} alt="Delete" />
@@ -441,13 +504,9 @@ const Whiteboard = ({
 
           {!!enabledControls.GO_TO_START && (
             <ToolbarItemS>
-              <ButtonS onClick={bringControlTOStartPosition}>
-                Move to initial location
-              </ButtonS>
+              <ButtonS onClick={bringControlTOStartPosition}>Move to initial location</ButtonS>
             </ToolbarItemS>
           )}
-
-          
         </ToolbarS>
         <ZoomBarS>
           {!!enabledControls.ZOOM && (

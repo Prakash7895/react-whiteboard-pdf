@@ -35,12 +35,16 @@ export const ButtonS = styled.button`
     vertical-align: middle;
   }
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: ${color};
   }
 
   &.selected {
     background-color: ${color};
+  }
+
+  &:disabled {
+    cursor: default;
   }
 `;
 
